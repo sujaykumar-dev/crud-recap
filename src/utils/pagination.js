@@ -3,6 +3,8 @@ import { ApiError } from "./ApiError.js";
 
 
 export const paginate = async (model,filter={},query={},options={})=>{
+    const softDeleteEnabled=options.softDelete !==false
+    const includeDeleted=options.includeDeleted ===true
     const page=parseInt(query.page) || 1;
     const limit = Math.min(parseInt(query.limit)|| 10,options.maxLimit ||100)
 
@@ -18,17 +20,16 @@ export const paginate = async (model,filter={},query={},options={})=>{
     }
     
     let mongooseQuery =  model.find(filter) 
-    
-    if(options.includeDeleted){
-        mongooseQuery=mongooseQuery.setOptions({includeDeleted:true})
+    let countFilter=filter
+    if(!includeDeleted && softDeleteEnabled){
+        mongooseQuery=mongooseQuery.where({isDeleted:{$ne:true}})
+        countFilter={...filter,isDeleted:{$ne:true}}
     }
-
+    
     const data = await mongooseQuery
     .sort(sort)
     .limit(limit)
     .skip(skip)
-    const countFilter=options.includeDeleted?
-    filter:{...filter,isDeleted:{$ne:true}}
     const total = await model.countDocuments(countFilter)
     return {
         data,

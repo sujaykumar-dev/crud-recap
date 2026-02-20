@@ -19,3 +19,5 @@ Concept Learned and implemented:
 ✅ Query middleware
 
 ✅ Token invalidation on delete
+
+✅ Audit Logs (utils, models, controllers, routes)

@@ -5,6 +5,8 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
 import { paginate } from "../utils/pagination.js";
+import { AuditLog } from "../models/auditLog.model.js";
+import { logAudit } from "../utils/auditLogger.js";
 
 const generateAccessAndRefreshToken = async (userId) => {
   try {
@@ -228,6 +230,13 @@ const updateUserRole=newRole=>asyncHandler(async(req,res)=>{
   }
   const updatedUser= await User.findById(id).select("-password -refreshToken")
 
+  await logAudit({
+    actor:req.user._id,
+    action:"USER ROLE UPDATED",
+    targetModel:"User",
+    targetId:user._id,
+    metadata:{newRole}
+  })
   return res.status(201).json(new ApiResponse(201,updatedUser,"User role Updated Successfully"))
 })
 
@@ -275,6 +284,13 @@ const deleteUser=asyncHandler(async(req,res)=>{
   user.deletedAt= new Date();
   user.refreshToken=undefined;    
   await user.save();
+
+  await logAudit({
+    actor:req.user._id,
+    action:"USER SOFT DELETED",
+    targetModel:"User",
+    targetId:user._id
+  })
   return res.status(200).json(new ApiResponse(200,{},"User soft-deleted Successfully"))
 })
 
@@ -292,15 +308,30 @@ const restore=asyncHandler(async(req,res)=>{
   user.deletedAt=null;
   await user.save()
 
-  const restoredUser= await user.findById(id).select("-password -refreshToken")
+  const restoredUser= await User.findById(id).select("-password -refreshToken")
 
   if(!restoredUser){
     throw new ApiError(500,"Error restoring user")
   }
+  await logAudit({
+    actor:req.user._id,
+    action:"USER RESTORED ",
+    targetModel:"User",
+    targetId:user._id
+  })
 
   return res.status(200).json(new ApiResponse(200,restoredUser,"User restored Successfully"))
 
 
+})
+const getAuditLogs=asyncHandler(async(req,res)=>{
+  const result= await paginate(
+    AuditLog,
+    {},
+    req.query,
+    {softDelete:false}
+  )
+  return res.status(200).json(new ApiResponse(200,result,"AuditLogs fetched successfully"))
 })
 export {
   registerUser,
@@ -314,5 +345,6 @@ export {
   deleteUser,
   updateUserRole,
   restore,
-  getUserByID
+  getUserByID,
+  getAuditLogs
 };
